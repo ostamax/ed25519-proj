@@ -7,7 +7,11 @@ edition = "2021"
 
 [dependencies]
 rand = "0.7.0"
-clap = { version = "4.0.10", features = ["derive"] }
+
+[dependencies.clap]
+version = "~2.27.0"
+default-features = false
+features = ["yaml"]
 
 [dependencies.ed25519-dalek]
 version = "1"

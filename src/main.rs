@@ -5,7 +5,7 @@ extern crate rand;
 use std::fs;
 use std::io::Read;
 
-use clap::Parser;
+use clap::{Arg, App};
 use ed25519_dalek::Keypair;
 use ed25519_dalek::PublicKey;
 use ed25519_dalek::SecretKey;
@@ -22,18 +22,18 @@ pub fn generate_keys() -> Keypair {
     keypair
 }
 
-pub fn write_keys_to_file(keypair: Keypair) {
+pub fn write_keys_to_file(keypair: Keypair, keys_path: &str) {
     let public_key_bytes: [u8; PUBLIC_KEY_LENGTH] = keypair.public.to_bytes();
 
     let secret_key_bytes: [u8; SECRET_KEY_LENGTH] = keypair.secret.to_bytes();
     println!("{:?}", public_key_bytes.len());
     println!("{:?}", secret_key_bytes.len());
-    fs::write("pk.txt", public_key_bytes).unwrap();
-    fs::write("sk.txt", secret_key_bytes).unwrap();
+    fs::write(format!("{keys_path}.pub"), public_key_bytes).unwrap();
+    fs::write(format!("{keys_path}"), secret_key_bytes).unwrap();
 }
 
 pub fn read_message_from_file() -> String {
-    let mut file = fs::File::open("message.txt").expect("Unable to open");
+    let mut file = fs::File::open("message.txt").expect("Unable to open message.txt file");
     let mut message = String::new();
     file.read_to_string(&mut message)
         .expect("Error while reading file");
@@ -41,7 +41,7 @@ pub fn read_message_from_file() -> String {
 }
 
 pub fn read_secret_key_from_file(secret_key_path: &str) -> SecretKey {
-    let mut file = fs::File::open(secret_key_path).expect("Unable to open");
+    let mut file = fs::File::open(secret_key_path).expect("Unable to open private key file");
 
     let mut secret_key_bytes = vec![];
     file.read_to_end(&mut secret_key_bytes).unwrap();
@@ -52,7 +52,7 @@ pub fn read_secret_key_from_file(secret_key_path: &str) -> SecretKey {
 }
 
 pub fn read_public_key_from_file(public_key_path: &str) -> PublicKey {
-    let mut file = fs::File::open(public_key_path).expect("Unable to open");
+    let mut file = fs::File::open(public_key_path).expect("Unable to open public key file");
     let mut public_key_bytes = vec![];
     file.read_to_end(&mut public_key_bytes).unwrap();
     let public_k: PublicKey = PublicKey::from_bytes(&public_key_bytes).unwrap();
@@ -60,16 +60,15 @@ pub fn read_public_key_from_file(public_key_path: &str) -> PublicKey {
 }
 
 pub fn sign_message(
-    message_string: String,
-    secret_key_path: &str,
-    public_key_path: &str,
+    keys_path: &str
 ) -> Signature {
-    let secret_key = read_secret_key_from_file(secret_key_path);
-    let public_key = read_public_key_from_file(public_key_path);
+    let secret_key = read_secret_key_from_file(&format!("{keys_path}"));
+    let public_key = read_public_key_from_file(&format!("{keys_path}.pub"));
     let keypair = Keypair {
         public: public_key,
         secret: secret_key,
     };
+    let message_string = read_message_from_file();
     let message: &[u8] = message_string.as_bytes();
     let signature = keypair.sign(message);
     println!("{:?}", signature);
@@ -79,11 +78,11 @@ pub fn sign_message(
 
 pub fn write_signature_to_file(signature: Signature) {
     let signature_bytes: [u8; SIGNATURE_LENGTH] = signature.to_bytes();
-    fs::write("signature.txt", signature_bytes).unwrap();
+    fs::write("signature.pem", signature_bytes).unwrap();
 }
 
 pub fn read_signature_from_file(signature_path: &str) -> Signature {
-    let mut file = fs::File::open(signature_path).expect("Unable to open");
+    let mut file = fs::File::open(signature_path).expect("Unable to open signature file");
     let mut signature_bytes = vec![];
     file.read_to_end(&mut signature_bytes).unwrap();
     let signature: Signature = Signature::from_bytes(&signature_bytes).unwrap();
@@ -91,45 +90,70 @@ pub fn read_signature_from_file(signature_path: &str) -> Signature {
 }
 
 pub fn verify_signature(
-    message_string: String,
     signature_path: &str,
-    public_key_path: &str,
+    keys_path: &str,
 ) -> bool {
-    let public_key = read_public_key_from_file(public_key_path);
+    let message_string = read_message_from_file();
+    let public_key = read_public_key_from_file(&format!("{keys_path}.pub"));
     let signature = read_signature_from_file(signature_path);
     let message: &[u8] = message_string.as_bytes();
     public_key.verify(message, &signature).is_ok()
 }
 
-#[derive(Parser, Default, Debug)]
-struct Args {
-    operation_type: String,
-    message: Option<String>,
-    key_path: Option<String>,
-}
-
 fn main() {
-    let args = Args::parse();
-    println!("{}", args.operation_type);
 
-    match args.operation_type.as_str() {
+    let app = App::new("ed25519")
+        .version("1.0.0")
+        .about("A simple CLI signer for ed25519 signatures")
+        .author("Maksym Ostapenko");
+    
+    let operation_name = Arg::with_name("operation_type")
+        .long("operation")
+        .short("o")
+        .takes_value(true)
+        .required(true)
+        .help("Operation type: generate/sign/verify");
+
+    let file_name = Arg::with_name("file_name")
+        .long("file")
+        .short("f")
+        .takes_value(true)
+        .required(true)
+        .default_value("key")
+        .help("File names for public and private keys. (They will be created '[file].pub' and '[file]') respectively");
+
+    let signature_path = Arg::with_name("signature")
+        .long("signature")
+        .short("s")
+        .takes_value(false)
+        .required(true)
+        .default_value("signature.pem")
+        .help("Path of the signature file (for verification)");
+
+    let app = app.args(&[operation_name, file_name, signature_path]);
+
+    let matches = app.get_matches();
+
+    match matches.value_of("operation_type").unwrap() {
         "generate" => {
             let generated_keypair = generate_keys();
-            write_keys_to_file(generated_keypair);
+            let keys_path = matches.value_of("file_name").unwrap();
+            write_keys_to_file(generated_keypair, keys_path);
         }
         "sign" => {
             println!("Signing");
-            let message = read_message_from_file();
-            println!("{:?}", message);
-            sign_message(String::from("f"), "sk.txt", "pk.txt");
+            let keys_path = matches.value_of("file_name").unwrap();
+            let signature = sign_message(keys_path);
+            println!("{:?}", signature);
         }
         "verify" => {
             println!("Verifying");
-            println!(
-                "{}",
-                verify_signature(String::from("f"), "signature.txt", "pk.txt")
-            );
+            let keys_path = matches.value_of("file_name").unwrap();
+            let signature_path = matches.value_of("signature").unwrap();
+            let is_verified = verify_signature(signature_path, keys_path);
+            println!("{}", is_verified);
         }
-        _ => panic!("unknown operation"),
+        _ => panic!("Unknown operation!")
     }
+    
 }
