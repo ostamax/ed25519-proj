@@ -30,7 +30,7 @@ fn main() {
         .takes_value(false)
         .required(true)
         .default_value("signature.pem")
-        .help("Path of the signature file (for verification)");
+        .help("Flag whether the signature file should be used (for verification)");
 
     let app = app.args(&[operation_name, file_name, signature_path]);
 
@@ -38,22 +38,24 @@ fn main() {
 
     match matches.value_of("operation_type").unwrap() {
         "generate" => {
+            println!("Keys generation");
             let generated_keypair = generate_keys();
             let keys_path = matches.value_of("file_name").unwrap();
             write_keys_to_file(generated_keypair, keys_path);
+            println!("Keys were successfully generated");
         }
         "sign" => {
             println!("Signing");
             let keys_path = matches.value_of("file_name").unwrap();
-            let signature = sign_message(keys_path);
-            println!("{:?}", signature);
+            sign_message(keys_path);
+            println!("Signature was successfully generated");
         }
         "verify" => {
             println!("Verifying");
             let keys_path = matches.value_of("file_name").unwrap();
             let signature_path = matches.value_of("signature").unwrap();
             let is_verified = verify_signature(signature_path, keys_path);
-            println!("{}", is_verified);
+            println!("Verification result - {}", is_verified);
         }
         _ => panic!("Unknown operation!"),
     }
