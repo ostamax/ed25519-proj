@@ -1,9 +1,11 @@
 extern crate clap;
 
+use log::{error, info};
 use clap::{App, Arg};
 use signature_module::ed25519_module::*;
 
 fn main() {
+    env_logger::init();
     let app = App::new("ed25519")
         .version("1.0.0")
         .about("A simple CLI signer for ed25519 signatures")
@@ -27,10 +29,10 @@ fn main() {
     let signature_path = Arg::with_name("signature")
         .long("signature")
         .short("s")
-        .takes_value(false)
+        .takes_value(true)
         .required(true)
         .default_value("signature.pem")
-        .help("Flag whether the signature file should be used (for verification)");
+        .help("Name of the signature file (for verification)");
 
     let app = app.args(&[operation_name, file_name, signature_path]);
 
@@ -38,25 +40,28 @@ fn main() {
 
     match matches.value_of("operation_type").unwrap() {
         "generate" => {
-            println!("Keys generation");
+            info!("{:?}", "Keys generation process started");
             let generated_keypair = generate_keys();
             let keys_path = matches.value_of("file_name").unwrap();
             write_keys_to_file(generated_keypair, keys_path);
-            println!("Keys were successfully generated");
+            info!("{:?}", "Keys were successfully generated");
         }
         "sign" => {
-            println!("Signing");
+            info!("{:?}", "Signing procedure started");
             let keys_path = matches.value_of("file_name").unwrap();
             sign_message(keys_path);
-            println!("Signature was successfully generated");
+            info!("{:?}", "The message was successfully signed");
         }
         "verify" => {
-            println!("Verifying");
+            info!("{:?}", "Verification process started");
             let keys_path = matches.value_of("file_name").unwrap();
             let signature_path = matches.value_of("signature").unwrap();
             let is_verified = verify_signature(signature_path, keys_path);
-            println!("Verification result - {}", is_verified);
+            info!("{:?}", &format!("Signature verification result: {is_verified}"));
         }
-        _ => panic!("Unknown operation!"),
+        _ => {
+            error!("{:?}", "Unknown operation was provided!");
+            panic!("Unknown operation!")
+        }
     }
 }
