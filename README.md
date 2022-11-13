@@ -31,14 +31,13 @@ Run testing in a sequential order:
     FLAGS:
 
         -h, --help       Prints help information
- 
         -V, --version    Prints version information
 
     OPTIONS:
         -f, --file <file_name>              File names for public and private keys. (They will be created '[file].pub' and
                                             '[file]') respectively [default: key]
         -o, --operation <operation_type>    Operation type: generate/sign/verify
-        -s, --signature <signature>         Flag whether the signature file should be used (for verification)
+        -s, --signature <signature>         Name of the signature file (for verification) [default: signature.pem]
 
 ### To run keys generation
 From the root folder of this project run
@@ -54,3 +53,5 @@ or
 
 ### To verify signature on the message
 Run `cargo run -- -o verify`
+or
+`cargo run -- -o verify -f files -s sign.pem`
