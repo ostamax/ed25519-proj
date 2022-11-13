@@ -1,6 +1,10 @@
 /target
-
+*/target
 Cargo.toml
+
+*/key
+*/key.pub
+*/signature.pem
 
 key
 key.pub
